@@ -844,31 +844,6 @@ def _incorporate_refgrid(
 # Convenience functions to match MATLAB style
 
 
-def lteULResourceGridSize(ue: Dict[str, Any]) -> Tuple[int, int]:
-    """
-    Get uplink resource grid size
-
-    Parameters
-    ----------
-    ue : dict
-        UE configuration
-
-    Returns
-    -------
-    nsc : int
-        Number of subcarriers
-    nsym : int
-        Number of symbols per subframe
-    """
-    nsc_rb = 12
-    nsc = ue['NULRB'] * nsc_rb
-
-    cp = ue.get('CyclicPrefixUL', 'Normal')
-    nsym = 14 if cp == 'Normal' else 12
-
-    return nsc, nsym
-
-
 def lteULPerfectChannelEstimate(
     ue: Dict[str, Any],
     chs: Dict[str, Any],
