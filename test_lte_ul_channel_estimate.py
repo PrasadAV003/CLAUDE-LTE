@@ -14,24 +14,6 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import sys
 
-# Import the SC-FDMA modulator and demodulator
-try:
-    from lte_scfdma_modulator import lteSCFDMAModulate
-    from lte_scfdma_demodulator import lteSCFDMADemodulate
-    from lte_pusch_drs import ltePUSCHDRS
-    from lte_pusch_drs_indices import ltePUSCHDRSIndices, UEConfig as DRSUEConfig, CHSConfig as DRSCHSConfig
-    from lte_ul_channel_estimate import lteULChannelEstimate, lteULResourceGridSize
-    IMPORTS_OK = True
-except ImportError as e:
-    print(f"Import error: {e}")
-    print("Make sure all required files are in the same directory:")
-    print("  - lte_scfdma_modulator.py")
-    print("  - lte_scfdma_demodulator.py")
-    print("  - lte_pusch_drs.py")
-    print("  - lte_pusch_drs_indices.py")
-    print("  - lte_ul_channel_estimate.py")
-    IMPORTS_OK = False
-
 
 def generate_multipath_channel(ue_config, num_taps=3, max_delay_samples=10):
     """
@@ -614,16 +596,6 @@ def run_all_tests():
     print("="*80)
     print(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("\nUsing REAL SC-FDMA modulation/demodulation chain")
-
-    if not IMPORTS_OK:
-        print("\n✗ CRITICAL: Cannot run tests due to import errors")
-        print("Please ensure all required files are available:")
-        print("  - lte_scfdma_modulator.py")
-        print("  - lte_scfdma_demodulator.py")
-        print("  - lte_pusch_drs.py")
-        print("  - lte_pusch_drs_indices.py")
-        print("  - lte_ul_channel_estimate.py")
-        return {}
 
     results = {}
 
