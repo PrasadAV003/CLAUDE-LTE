@@ -290,8 +290,9 @@ class LTESCFDMAModulator:
         waveform = np.zeros((total_samples, nAnts), dtype=np.complex128)
 
         # Pre-calculate windows (one per CP length)
-        window0 = self._raised_cosine_window(nFFT + cpLengths[0], N)
-        window1 = self._raised_cosine_window(nFFT + cpLengths[1], N)
+        # Window length = nFFT + cpLength + N (total extended symbol length)
+        window0 = self._raised_cosine_window(nFFT + cpLengths[0] + N, N)
+        window1 = self._raised_cosine_window(nFFT + cpLengths[1] + N, N)
 
         # MATLAB: firstSC = (nFFT/2) - (nSC/2) + 1 (MATLAB 1-indexed)
         # Python (0-indexed): firstSC = nFFT//2 - nSC//2
