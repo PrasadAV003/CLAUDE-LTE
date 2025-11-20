@@ -90,7 +90,8 @@ class LTESCFDMAModulator:
                 freq_array, time_array,
                 direction='FFTW_BACKWARD',
                 flags=('FFTW_MEASURE',),
-                threads=pyfftw.config.NUM_THREADS
+                threads=pyfftw.config.NUM_THREADS,
+                normalise_idft=True  # Match MATLAB ifft normalization
             )
 
             self._ifft_plans[nfft] = {
