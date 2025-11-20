@@ -281,12 +281,12 @@ class LTESCFDMADemodulator:
                     fft_plan()
                     fftOutput = freq_array.copy()
 
+                    # Apply phase correction BEFORE fftshift
+                    fftOutput = fftOutput * phaseCorrection
+
                     # fftshift
                     # MATLAB: fftshift(...,1)
                     fftOutput = np.fft.fftshift(fftOutput)
-
-                    # Apply phase correction
-                    fftOutput = fftOutput * phaseCorrection
 
                     # Apply zero threshold
                     fftOutput = apply_zero_threshold(fftOutput)
