@@ -342,21 +342,32 @@ class LTESCFDMAModulator:
                     windowed = extended * window1
 
                 # Overlap-add with "head" chopping (MATLAB logic)
-                if i == 0:
-                    # First symbol: chop head and save it
-                    head = windowed[:N].copy()
-                    L = cpLength + nFFT
-                    waveform[pos:pos+L, ant] = windowed[N:N+L]
+                if N > 0:
+                    if i == 0:
+                        # First symbol: chop head and save it
+                        head = windowed[:N].copy()
+                        L = cpLength + nFFT
+                        waveform[pos:pos+L, ant] = windowed[N:N+L]
+                    else:
+                        # Subsequent symbols: overlap then add
+                        L = cpLength + nFFT + N
+
+                        # Add gap samples at end of each slot
+                        if (i + 1) % symbols_per_slot == 0:
+                            L = cpLength + nFFT + N + gapSamples
+                            windowed = np.concatenate([windowed, np.zeros(gapSamples)])
+
+                        waveform[pos-N:pos-N+L, ant] += windowed
                 else:
-                    # Subsequent symbols: overlap then add
-                    L = cpLength + nFFT + N
+                    # No windowing: just copy samples
+                    L = cpLength + nFFT
 
                     # Add gap samples at end of each slot
                     if (i + 1) % symbols_per_slot == 0:
-                        L = cpLength + nFFT + N + gapSamples
-                        windowed = np.concatenate([windowed, np.zeros(gapSamples)])
-
-                    waveform[pos-N:pos-N+L, ant] += windowed
+                        waveform[pos:pos+L, ant] = windowed[:L]
+                        waveform[pos+L:pos+L+gapSamples, ant] = 0
+                    else:
+                        waveform[pos:pos+L, ant] = windowed[:L]
 
                 # Update position
                 if (i + 1) % symbols_per_slot == 0:
@@ -365,7 +376,7 @@ class LTESCFDMAModulator:
                     pos += cpLength + nFFT
 
             # MATLAB: Finally overlap "head" with end of signal
-            if head is not None:
+            if head is not None and N > 0:
                 waveform[-N:, ant] += head
 
         return waveform, info
