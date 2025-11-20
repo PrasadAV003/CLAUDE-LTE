@@ -299,7 +299,7 @@ class LTESCFDMADemodulator:
                     reGrid[:, symbol_idx, ant] = activeSCs
 
                     # Update offset
-                    if (sym_in_slot + 1) % 7 == 0:
+                    if (sym_in_slot + 1) == symbols_per_slot:
                         offset += nFFT + cpLength + gapSamples
                     else:
                         offset += nFFT + cpLength
