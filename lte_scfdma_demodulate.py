@@ -354,7 +354,7 @@ if __name__ == '__main__':
     print("="*60)
 
     # Test round-trip
-    from lte_scfdma_modulate_matlab import lteSCFDMAModulate
+    from lte_scfdma_modulate import lteSCFDMAModulate
 
     ue = {'NULRB': 6, 'CyclicPrefixUL': 'Normal'}
 
