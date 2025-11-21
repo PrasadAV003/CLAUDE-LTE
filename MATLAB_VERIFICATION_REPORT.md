@@ -246,7 +246,12 @@ Tested complete chain with CRC-8, CRC-16, CRC-24A, CRC-24B
 - `lteCodeBlockSegment()` MATLAB wrapper
 - No CRC functions
 
-**3. ctr_encode.py** - COMPLETE IMPLEMENTATION
+**3. turbo_encode.py** - Turbo encoding ONLY
+- `LTE_TurboEncoder` class (PCCC with QPP interleaver)
+- `lteTurboEncode()` MATLAB wrapper
+- No CRC or segmentation
+
+**4. ctr_encode.py** - COMPLETE IMPLEMENTATION
 - All four classes:
   - `LTE_CRC`
   - `LTE_CodeBlockSegmentation`
@@ -254,6 +259,12 @@ Tested complete chain with CRC-8, CRC-16, CRC-24A, CRC-24B
   - `LTE_RateMatching`
 - `lteTurboEncode()` MATLAB wrapper
 - Self-contained, no external imports
+
+### Usage Flexibility
+
+Users can choose:
+- **Individual modules** for specific functionality (crc_encode, code_block_segment, turbo_encode)
+- **Complete module** (ctr_encode) for all-in-one implementation
 
 ---
 
