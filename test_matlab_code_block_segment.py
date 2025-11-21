@@ -9,7 +9,7 @@ MATLAB Documentation Tests:
 """
 
 import numpy as np
-from crc_encode import lteCodeBlockSegment, LTE_CRC_CodeBlockSegmentation
+from code_block_segment import lteCodeBlockSegment, LTE_CodeBlockSegmentation
 
 def test_no_segmentation():
     """
@@ -137,11 +137,11 @@ def test_detailed_comparison():
     print("TEST 4: Internal Implementation vs MATLAB Wrapper")
     print("="*70)
 
-    processor = LTE_CRC_CodeBlockSegmentation()
+    processor = LTE_CodeBlockSegmentation()
     input_bits = np.ones(6145, dtype=int)
 
     # Internal implementation
-    code_blocks_internal, info = processor.code_block_segmentation(input_bits)
+    code_blocks_internal, info = processor.segment(input_bits)
 
     # MATLAB wrapper
     code_blocks_wrapper = lteCodeBlockSegment(input_bits)
