@@ -57,6 +57,10 @@ print()
 print('=== DEMODULATION ===')
 grid_out = lteSCFDMADemodulate(ue, waveform)
 
+# Squeeze antenna dimension if present
+if grid_out.ndim == 3:
+    grid_out = grid_out.squeeze(axis=2)
+
 print(f'Output grid shape: [{grid_out.shape[0]}, {grid_out.shape[1]}]')
 print(f'First 5 subcarriers of symbol 1: {grid_out[0:5, 0]}')
 print()

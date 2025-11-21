@@ -17,13 +17,7 @@ Date: 2025-11-20
 """
 
 import numpy as np
-import pyfftw
 from typing import Dict, Tuple, Optional
-
-# Enable PyFFTW optimizations
-pyfftw.interfaces.cache.enable()
-pyfftw.config.NUM_THREADS = 4
-pyfftw.config.PLANNER_EFFORT = 'FFTW_MEASURE'
 
 ZERO_THRESHOLD = 1e-15
 
