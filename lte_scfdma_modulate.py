@@ -312,12 +312,9 @@ class LTESCFDMAModulator:
 
             # For each symbol
             for i in range(nSymbols):
-                # SC-FDMA: DFT spreading (M-point FFT)
-                dftOut = np.fft.fft(grid[:, i, ant], nSC)
-
                 # Map to IFFT input - CONTIGUOUS block
                 freq_array[:] = 0
-                freq_array[firstSC:firstSC+nSC] = dftOut
+                freq_array[firstSC:firstSC+nSC] = grid[:, i, ant]
 
                 # MATLAB: iffout = ifft(fftshift(ifftin,1))
                 freq_array[:] = np.fft.fftshift(freq_array)
