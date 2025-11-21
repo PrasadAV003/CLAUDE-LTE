@@ -81,21 +81,12 @@ class LTESCFDMAModulator:
         self._ifft_plans = {}
 
     def _get_ifft_plan(self, nfft: int):
-        """Get or create cached IFFT plan"""
+        """Get or create cached IFFT arrays (using numpy.fft instead of PyFFTW)"""
         if nfft not in self._ifft_plans:
-            freq_array = pyfftw.empty_aligned(nfft, dtype='complex128')
-            time_array = pyfftw.empty_aligned(nfft, dtype='complex128')
-
-            ifft_plan = pyfftw.FFTW(
-                freq_array, time_array,
-                direction='FFTW_BACKWARD',
-                flags=('FFTW_MEASURE',),
-                threads=pyfftw.config.NUM_THREADS,
-                normalise_idft=True  # Match MATLAB ifft normalization
-            )
+            freq_array = np.zeros(nfft, dtype='complex128')
+            time_array = np.zeros(nfft, dtype='complex128')
 
             self._ifft_plans[nfft] = {
-                'plan': ifft_plan,
                 'freq_array': freq_array,
                 'time_array': time_array
             }
@@ -299,11 +290,9 @@ class LTESCFDMAModulator:
         # Python (0-indexed): firstSC = nFFT//2 - nSC//2
         firstSC = (nFFT // 2) - (nSC // 2)
 
-        # Get IFFT plan
+        # Get IFFT arrays
         ifft_dict = self._get_ifft_plan(nFFT)
-        ifft_plan = ifft_dict['plan']
         freq_array = ifft_dict['freq_array']
-        time_array = ifft_dict['time_array']
 
         # Process each antenna
         for ant in range(nAnts):
@@ -318,8 +307,7 @@ class LTESCFDMAModulator:
 
                 # MATLAB: iffout = ifft(fftshift(ifftin,1))
                 freq_array[:] = np.fft.fftshift(freq_array)
-                ifft_plan()
-                iffout = time_array.copy()
+                iffout = np.fft.ifft(freq_array)
 
                 # Get CP length for this symbol
                 cpLength = cpLengths[i % len(cpLengths)]

@@ -58,20 +58,12 @@ class LTESCFDMADemodulator:
         self._fft_plans = {}
 
     def _get_fft_plan(self, nfft: int):
-        """Get or create cached FFT plan"""
+        """Get or create cached FFT arrays (using numpy.fft instead of PyFFTW)"""
         if nfft not in self._fft_plans:
-            time_array = pyfftw.empty_aligned(nfft, dtype='complex128')
-            freq_array = pyfftw.empty_aligned(nfft, dtype='complex128')
-
-            fft_plan = pyfftw.FFTW(
-                time_array, freq_array,
-                direction='FFTW_FORWARD',
-                flags=('FFTW_MEASURE',),
-                threads=pyfftw.config.NUM_THREADS
-            )
+            time_array = np.zeros(nfft, dtype='complex128')
+            freq_array = np.zeros(nfft, dtype='complex128')
 
             self._fft_plans[nfft] = {
-                'plan': fft_plan,
                 'time_array': time_array,
                 'freq_array': freq_array
             }
@@ -229,11 +221,8 @@ class LTESCFDMADemodulator:
         # MATLAB: idx = 0:nFFT-1
         idx = np.arange(nFFT)
 
-        # Get FFT plan
-        fft_dict = self._get_fft_plan(nFFT)
-        fft_plan = fft_dict['plan']
-        time_array = fft_dict['time_array']
-        freq_array = fft_dict['freq_array']
+        # Get FFT arrays (not used anymore with numpy.fft)
+        # fft_dict = self._get_fft_plan(nFFT)
 
         # Process each antenna
         for ant in range(nAnts):
@@ -277,9 +266,7 @@ class LTESCFDMADemodulator:
                     samples = samples * halfsc
 
                     # FFT
-                    time_array[:] = samples
-                    fft_plan()
-                    fftOutput = freq_array.copy()
+                    fftOutput = np.fft.fft(samples)
 
                     # Apply phase correction BEFORE fftshift
                     fftOutput = fftOutput * phaseCorrection
