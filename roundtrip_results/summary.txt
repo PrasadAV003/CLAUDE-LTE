@@ -1,9 +1,9 @@
 LTE CHANNEL CODING ROUND-TRIP TEST SUMMARY
 ================================================================================
 
-Size:    40 bits | Errors:    18 | Status: FAIL
-Size:  1088 bits | Errors:   560 | Status: FAIL
-Size:  6144 bits | Errors:  3018 | Status: FAIL
+Size:    40 bits | Errors:    22 | Status: FAIL
+Size:  1088 bits | Errors:   549 | Status: FAIL
+Size:  6144 bits | Errors:  2553 | Status: FAIL
 
 
 ✗ SOME TESTS FAILED!

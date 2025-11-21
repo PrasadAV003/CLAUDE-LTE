@@ -520,56 +520,62 @@ class LTE_RateRecovery:
             1, 17, 9, 25, 5, 21, 13, 29, 3, 19, 11, 27, 7, 23, 15, 31
         ], dtype=int)
 
-    def sub_block_deinterleaver(self, d: np.ndarray) -> np.ndarray:
-        """Inverse of sub-block interleaver"""
-        D = len(d)
-        if D == 0:
-            return d
+    def sub_block_deinterleaver(self, v: np.ndarray) -> np.ndarray:
+        """
+        Inverse of sub-block interleaver
 
-        R_sb = 32
-        C_sb = int(np.ceil(D / R_sb))
-        N_dummy = R_sb * C_sb - D
+        Interleaver did:
+        1. Pad with N_D dummy bits at start
+        2. Write row-by-row into (R_subblock x 32) matrix
+        3. Permute columns
+        4. Read column-by-column (Fortran order)
 
-        y = np.full(R_sb * C_sb, np.nan, dtype=float)
-        y[N_dummy:] = d
+        Deinterleaver reverses:
+        1. Input v has length K_pi (includes positions that had dummies as zeros)
+        2. Write column-by-column into (R_subblock x 32) matrix
+        3. Un-permute columns
+        4. Read row-by-row
+        5. First N_D values are dummies (zeros)
+        """
+        if len(v) == 0:
+            return v
 
-        matrix = y.reshape(C_sb, R_sb).T
+        C_subblock = 32
 
+        # v has length K_pi = R_subblock * 32
+        K_pi = len(v)
+        R_subblock = K_pi // C_subblock
+
+        # v was read column-major from permuted matrix
+        # So write it column-major to reconstruct permuted matrix
+        matrix_permuted = v.reshape(R_subblock, C_subblock, order='F')
+
+        # Un-permute columns
         inv_pattern = np.argsort(self.sub_block_interleaver_pattern)
-        deinterleaved_matrix = matrix[inv_pattern, :]
+        matrix_original = matrix_permuted[:, inv_pattern]
 
-        output = deinterleaved_matrix.T.flatten()
-        output = output[~np.isnan(output)]
+        # Read row-major to get original sequence (with dummies at start)
+        y = matrix_original.flatten(order='C')
 
-        return output
+        return y
 
     def inverse_bit_selection(self, e_bits: np.ndarray, K_w: int, rv: int,
                               R_subblock: int) -> np.ndarray:
-        """Inverse of bit selection"""
+        """Inverse of bit selection with soft combining"""
         w = np.zeros(K_w, dtype=float)
 
         # Circular buffer parameters
         N_cb = K_w
-        k = 0
-        j = 0
 
-        # Starting point based on RV
-        if rv == 0:
-            k_0 = 0
-        elif rv == 1:
-            k_0 = int(np.floor(R_subblock * (3/4))) * 3
-        elif rv == 2:
-            k_0 = 0
-        else:  # rv == 3
-            k_0 = int(np.floor(R_subblock * (3/4))) * 3
+        # Calculate starting position (must match rate matching!)
+        # From 3GPP TS 36.212: k_0 = R_subblock * (2 * ⌈N_cb/(8*R_subblock)⌉ * rv + 2)
+        k_0 = int(R_subblock * (2 * np.ceil(N_cb / (8 * R_subblock)) * rv + 2))
 
-        k = k_0
-
-        # Fill circular buffer
-        while j < len(e_bits):
-            w[k % N_cb] = e_bits[j]
-            k += 1
-            j += 1
+        # Fill circular buffer with soft combining
+        # If multiple soft values map to same position, add them (soft combining)
+        for j in range(len(e_bits)):
+            idx = (k_0 + j) % N_cb
+            w[idx] += e_bits[j]  # Soft combining: add LLRs
 
         return w
 
@@ -577,30 +583,43 @@ class LTE_RateRecovery:
                                 cbsbuffer: Optional[np.ndarray] = None) -> np.ndarray:
         """Rate recovery for single code block"""
         D = K + 4
-        K_pi = 3 * D
 
-        # Step 1: Determine R_subblock
-        R_subblock = int(np.ceil(K_pi / 32))
-        K_w = 3 * R_subblock * 32
+        # Calculate sub-block interleaver size
+        R_subblock = int(np.ceil(D / 32))
+        K_pi = R_subblock * 32
+        N_dummy = K_pi - D  # Number of dummy bit positions
 
-        # Step 2: Inverse bit selection
+        # Circular buffer size
+        K_w = 3 * K_pi
+
+        # Step 1: Inverse bit selection
         w_all = self.inverse_bit_selection(e_bits, K_w, rv, R_subblock)
 
-        # Step 3: Split into three streams
-        w0 = w_all[0::3]
-        w1 = w_all[1::3]
-        w2 = w_all[2::3]
+        # Step 2: Extract three streams from circular buffer
+        # Circular buffer format from rate matching:
+        # w[k] = v0[k] for k = 0,..., K_Π - 1
+        # w[K_Π + 2k] = v1[k] for k = 0,..., K_Π - 1
+        # w[K_Π + 2k+1] = v2[k] for k = 0,..., K_Π - 1
 
-        # Step 4: Sub-block deinterleaving
-        v0 = self.sub_block_deinterleaver(w0)
-        v1 = self.sub_block_deinterleaver(w1)
-        v2 = self.sub_block_deinterleaver(w2)
+        v0 = w_all[0:K_pi].copy()
+        v1 = np.zeros(K_pi, dtype=float)
+        v2 = np.zeros(K_pi, dtype=float)
 
-        # Reconstruct output
-        output = np.zeros(K_pi, dtype=float)
-        output[0:D] = v0[0:D]
-        output[D:2*D] = v1[0:D]
-        output[2*D:3*D] = v2[0:D]
+        for k in range(K_pi):
+            v1[k] = w_all[K_pi + 2*k]
+            v2[k] = w_all[K_pi + 2*k + 1]
+
+        # Step 3: Sub-block deinterleaving
+        # Returns sequences of length K_pi (with dummy bits as zeros at start)
+        d0 = self.sub_block_deinterleaver(v0)
+        d1 = self.sub_block_deinterleaver(v1)
+        d2 = self.sub_block_deinterleaver(v2)
+
+        # Step 4: Remove dummy bits (first N_dummy values) and reconstruct [S | P1 | P2]
+        output = np.zeros(3*D, dtype=float)
+        output[0:D] = d0[N_dummy:N_dummy+D]
+        output[D:2*D] = d1[N_dummy:N_dummy+D]
+        output[2*D:3*D] = d2[N_dummy:N_dummy+D]
 
         # HARQ soft combining
         if cbsbuffer is not None and len(cbsbuffer) > 0:
