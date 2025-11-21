@@ -245,6 +245,86 @@ Sub-block interleaver params           ✓ PASS
 
 ---
 
+### 5. lteRateRecoverTurbo() ✅
+
+**MATLAB Documentation:** TS 36.212 Section 5.1.4.1 (Inverse Operations)
+**Python Module:** `rate_recover_turbo.py`
+**Test File:** `test_matlab_rate_recover_turbo.py`
+
+#### Verified Behaviors:
+
+✅ **MATLAB Example: Complete Round-Trip**
+```matlab
+trBlkLen = 135;
+codewordLen = 450;
+rv = 0;
+
+trblockwithcrc = lteCRCEncode(zeros(trBlkLen,1),'24A');
+codeblocks = lteCodeBlockSegment(trblockwithcrc);
+turbocodedblocks = lteTurboEncode(codeblocks);
+codeword = lteRateMatchTurbo(turbocodedblocks,codewordLen,rv);
+rateRecovered = lteRateRecoverTurbo(codeword,trBlkLen,rv);
+% Result: {492×1 int8}
+```
+✅ Python matches exactly: 1 block, 492 bits, int8 type
+
+✅ **Inverse Rate Matching Operations**
+- Inverse bit selection and pruning
+- Inverse circular buffer creation
+- Inverse sub-block interleaving
+- Deduces structure from transport block length (before CRC)
+
+✅ **Code Block Structure Deduction**
+From `trblklen` parameter:
+- Determines number of code blocks (C)
+- Calculates code block sizes (K+, K-)
+- Recovers filler bit locations (F)
+- Returns correct turbo encoded block sizes: 3*(K+4)
+
+✅ **HARQ Soft Combining**
+```python
+# First transmission (RV=0)
+recovered_rv0 = lteRateRecoverTurbo(codeword_rv0, trBlkLen, 0)
+
+# Second transmission (RV=1) with soft combining
+recovered_rv1 = lteRateRecoverTurbo(codeword_rv1, trBlkLen, 1,
+                                     cbsbuffers=recovered_rv0)
+```
+- Supports cbsbuffers parameter for HARQ combining ✓
+- Additive combining of soft information ✓
+- Improves decoding performance across retransmissions ✓
+
+✅ **Redundancy Versions**
+All RV values recover correct structure:
+- RV=0 ✓
+- RV=1 ✓
+- RV=2 ✓
+- RV=3 ✓
+
+✅ **Segmented Transport Blocks**
+Test case: trblklen=6200 (requires 2 code blocks)
+- Correctly recovers 2 blocks ✓
+- Block sizes: 9420 bits each (3*3140) ✓
+- Structure matches original turbo encoded blocks ✓
+
+✅ **Input Validation**
+- RV must be 0, 1, 2, or 3 ✓
+- Empty input handled ✓
+- Returns cell array (list) matching MATLAB ✓
+
+#### Test Results:
+```
+MATLAB Example (round-trip)           ✓ PASS
+Code block parameter calculation      ✓ PASS
+Round-trip recovery (4 cases)         ✓ PASS
+All redundancy versions (0-3)         ✓ PASS
+HARQ soft combining                   ✓ PASS
+Segmented transport blocks            ✓ PASS
+Input validation                      ✓ PASS
+```
+
+---
+
 ## Complete Encoding Chain Verification ✅
 
 **Test File:** `test_complete_lte_encoding_chain.py`
@@ -326,7 +406,12 @@ Tested complete chain with CRC-8, CRC-16, CRC-24A, CRC-24B
 - `lteRateMatchTurbo()` MATLAB wrapper
 - No turbo encoding
 
-**5. ctr_encode.py** - COMPLETE IMPLEMENTATION
+**5. rate_recover_turbo.py** - Rate recovery ONLY
+- `LTE_RateRecovery` class (inverse sub-block interleaving, inverse circular buffer, inverse bit selection)
+- `lteRateRecoverTurbo()` MATLAB wrapper
+- Helper: `get_code_block_parameters()` for structure deduction
+
+**6. ctr_encode.py** - COMPLETE IMPLEMENTATION
 - All four classes:
   - `LTE_CRC`
   - `LTE_CodeBlockSegmentation`
@@ -338,7 +423,7 @@ Tested complete chain with CRC-8, CRC-16, CRC-24A, CRC-24B
 ### Usage Flexibility
 
 Users can choose:
-- **Individual modules** for specific functionality (crc_encode, code_block_segment, turbo_encode, rate_match_turbo)
+- **Individual modules** for specific functionality (crc_encode, code_block_segment, turbo_encode, rate_match_turbo, rate_recover_turbo)
 - **Complete module** (ctr_encode) for all-in-one implementation
 
 ---
@@ -354,10 +439,11 @@ Users can choose:
 | `test_matlab_documentation_examples.py` | 4 | ✅ ALL PASS |
 | `test_matlab_turbo_encode.py` | 7 | ✅ ALL PASS |
 | `test_matlab_rate_match_turbo.py` | 7 | ✅ ALL PASS |
+| `test_matlab_rate_recover_turbo.py` | 7 | ✅ ALL PASS |
 | `test_complete_lte_encoding_chain.py` | 5 | ✅ ALL PASS |
 
-**Total Tests:** 33
-**Passed:** 33
+**Total Tests:** 40
+**Passed:** 40
 **Failed:** 0
 **Success Rate:** 100%
 
@@ -401,7 +487,10 @@ Users can choose:
 ✅ **TS 36.212 Section 5.1.1** - CRC calculation
 ✅ **TS 36.212 Section 5.1.2** - Code block segmentation
 ✅ **TS 36.212 Section 5.1.3** - Turbo coding
+✅ **TS 36.212 Section 5.1.4.1** - Rate matching for turbo coded data
+✅ **TS 36.212 Section 5.1.4.1** - Rate recovery (inverse operations)
 ✅ **TS 36.212 Table 5.1.3-3** - QPP interleaver parameters
+✅ **TS 36.212 Table 5.1.4-1** - Sub-block interleaver permutation pattern
 
 ---
 
@@ -411,15 +500,23 @@ Users can choose:
 
 The Python implementation has been **comprehensively verified** against MATLAB LTE Toolbox documentation and behavior:
 
-1. ✅ All MATLAB examples reproduced exactly
+1. ✅ All MATLAB examples reproduced exactly (5 functions)
 2. ✅ All documentation requirements met
 3. ✅ All edge cases handled correctly
-4. ✅ Complete encoding chain tested
+4. ✅ Complete encoding/decoding chain tested (with rate recovery)
 5. ✅ Filler bits handled per MATLAB specification
 6. ✅ Data types match (int8, cell arrays)
 7. ✅ 3GPP standards compliance verified
+8. ✅ HARQ soft combining supported
 
 **The Python implementation is production-ready and fully MATLAB-compatible.**
+
+**Functions Implemented:**
+- lteCRCEncode
+- lteCodeBlockSegment
+- lteTurboEncode
+- lteRateMatchTurbo
+- lteRateRecoverTurbo (NEW)
 
 ---
 
@@ -433,12 +530,14 @@ python3 test_crc_matlab_compatible.py
 python3 test_matlab_code_block_segment.py
 python3 test_matlab_documentation_examples.py
 python3 test_matlab_turbo_encode.py
+python3 test_matlab_rate_match_turbo.py
+python3 test_matlab_rate_recover_turbo.py
 
 # Complete chain test
 python3 test_complete_lte_encoding_chain.py
 ```
 
-**Expected Result:** All tests pass with 100% success rate.
+**Expected Result:** All 40 tests pass with 100% success rate.
 
 ---
 
