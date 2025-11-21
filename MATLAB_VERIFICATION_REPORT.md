@@ -178,7 +178,7 @@ Legal input sizes             ✓ PASS
 ### 4. lteRateMatchTurbo() ✅
 
 **MATLAB Documentation:** TS 36.212 Section 5.1.4.1
-**Python Module:** `ctr_encode.py`
+**Python Module:** `ctr_encode.py`, `rate_match_turbo.py`
 **Test File:** `test_matlab_rate_match_turbo.py`
 
 #### Verified Behaviors:
@@ -321,7 +321,12 @@ Tested complete chain with CRC-8, CRC-16, CRC-24A, CRC-24B
 - `lteTurboEncode()` MATLAB wrapper
 - No CRC or segmentation
 
-**4. ctr_encode.py** - COMPLETE IMPLEMENTATION
+**4. rate_match_turbo.py** - Rate matching ONLY
+- `LTE_RateMatching` class (sub-block interleaving, circular buffer, bit selection)
+- `lteRateMatchTurbo()` MATLAB wrapper
+- No turbo encoding
+
+**5. ctr_encode.py** - COMPLETE IMPLEMENTATION
 - All four classes:
   - `LTE_CRC`
   - `LTE_CodeBlockSegmentation`
@@ -333,7 +338,7 @@ Tested complete chain with CRC-8, CRC-16, CRC-24A, CRC-24B
 ### Usage Flexibility
 
 Users can choose:
-- **Individual modules** for specific functionality (crc_encode, code_block_segment, turbo_encode)
+- **Individual modules** for specific functionality (crc_encode, code_block_segment, turbo_encode, rate_match_turbo)
 - **Complete module** (ctr_encode) for all-in-one implementation
 
 ---
