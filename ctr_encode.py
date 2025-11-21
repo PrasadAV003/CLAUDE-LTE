@@ -11,22 +11,22 @@ MATLAB COMPATIBILITY FIXES:
 
 import numpy as np
 from typing import List, Tuple, Dict
+from code_block_segment import LTE_CodeBlockSegmentation, lteCodeBlockSegment
 
 # ============================================================================
-# CRC AND CODE BLOCK SEGMENTATION
+# CRC CALCULATION
 # ============================================================================
 
-class LTE_CRC_CodeBlockSegmentation:
+class LTE_CRC:
     """
-    LTE CRC Calculation and Code Block Segmentation
-    Based on 3GPP TS 36.212 Section 5.1.1 and 5.1.2
-    MATLAB-COMPATIBLE VERSION - Matches lteCRCEncode and lteCodeBlockSegment
+    LTE CRC Calculation
+    Based on 3GPP TS 36.212 Section 5.1.1
+    MATLAB-COMPATIBLE VERSION - Matches lteCRCEncode
+
+    Note: Code block segmentation is in separate module (code_block_segment.py)
     """
 
     def __init__(self):
-        # Maximum code block size
-        self.Z = 6144
-
         # CRC Generator Polynomials (MSB first, length includes x^n term)
         # gCRC24A(D) = D^24 + D^23 + D^18 + D^17 + D^14 + D^11 + D^10 + D^7 + D^6 + D^5 + D^4 + D^3 + D + 1
         self.gCRC24A = [1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1]
@@ -39,22 +39,6 @@ class LTE_CRC_CodeBlockSegmentation:
 
         # gCRC8(D) = D^8 + D^7 + D^4 + D^3 + D + 1
         self.gCRC8 = [1, 1, 0, 0, 1, 1, 0, 1, 1]
-
-        # Valid turbo interleaver block sizes from table 5.1.3-3
-        self.K_table = [
-            40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192,
-            200, 208, 216, 224, 232, 240, 248, 256, 264, 272, 280, 288, 296, 304, 312, 320, 328, 336,
-            344, 352, 360, 368, 376, 384, 392, 400, 408, 416, 424, 432, 440, 448, 456, 464, 472, 480,
-            488, 496, 504, 512, 528, 544, 560, 576, 592, 608, 624, 640, 656, 672, 688, 704, 720, 736,
-            752, 768, 784, 800, 816, 832, 848, 864, 880, 896, 912, 928, 944, 960, 976, 992, 1008, 1024,
-            1056, 1088, 1120, 1152, 1184, 1216, 1248, 1280, 1312, 1344, 1376, 1408, 1440, 1472, 1504,
-            1536, 1568, 1600, 1632, 1664, 1696, 1728, 1760, 1792, 1824, 1856, 1888, 1920, 1952, 1984,
-            2016, 2048, 2112, 2176, 2240, 2304, 2368, 2432, 2496, 2560, 2624, 2688, 2752, 2816, 2880,
-            2944, 3008, 3072, 3136, 3200, 3264, 3328, 3392, 3456, 3520, 3584, 3648, 3712, 3776, 3840,
-            3904, 3968, 4032, 4096, 4160, 4224, 4288, 4352, 4416, 4480, 4544, 4608, 4672, 4736, 4800,
-            4864, 4928, 4992, 5056, 5120, 5184, 5248, 5312, 5376, 5440, 5504, 5568, 5632, 5696, 5760,
-            5824, 5888, 5952, 6016, 6080, 6144
-        ]
 
     def crc_calculate(self, input_bits, generator_poly, L):
         """
@@ -116,116 +100,6 @@ class LTE_CRC_CodeBlockSegmentation:
 
         # Return input (with -1 preserved) + CRC
         return np.concatenate([input_bits, parity_bits])
-
-    def code_block_segmentation(self, input_bits):
-        """
-        Code block segmentation following 3GPP TS 36.212 Section 5.1.2
-
-        MATLAB-COMPATIBLE: Filler bits represented as -1 (NULL)
-        """
-        input_bits = np.array(input_bits, dtype=int)
-        B = len(input_bits)
-
-        # Determine if segmentation is needed
-        if B <= self.Z:
-            L = 0
-            C = 1
-            B_prime = B
-        else:
-            L = 24
-            C = int(np.ceil(B / (self.Z - L)))
-            B_prime = B + C * L
-
-        # Find K+ and K- from table
-        if C == 1:
-            K_plus = min([k for k in self.K_table if k >= B], default=6144)
-            K_minus = 0
-            C_plus = 1
-            C_minus = 0
-        else:
-            K_plus = min([k for k in self.K_table if C * k >= B_prime], default=6144)
-
-            K_minus_candidates = [k for k in self.K_table if k < K_plus]
-            if K_minus_candidates:
-                K_minus = max(K_minus_candidates)
-            else:
-                K_minus = 0
-
-            if K_minus > 0:
-                delta_K = K_plus - K_minus
-                C_minus = int(np.floor((C * K_plus - B_prime) / delta_K))
-                C_plus = C - C_minus
-            else:
-                C_plus = C
-                C_minus = 0
-
-            if C_minus == 0:
-                K_minus = 0
-
-        # Calculate filler bits
-        if C == 1:
-            F = K_plus - B
-        else:
-            F = C_plus * K_plus + C_minus * K_minus - B_prime
-
-        # Generate code blocks
-        code_blocks = []
-        bit_index = 0
-
-        for r in range(C):
-            if r < C_minus:
-                K_r = K_minus
-            else:
-                K_r = K_plus
-
-            code_block = np.zeros(K_r, dtype=int)
-
-            if r == 0:
-                filler_count = F
-                data_start = F
-                # MATLAB-COMPATIBLE: Filler bits set to -1 (NULL)
-                code_block[:F] = -1
-            else:
-                filler_count = 0
-                data_start = 0
-
-            data_length = K_r - L if L > 0 else K_r
-
-            # Fill data bits
-            for k in range(data_start, data_length):
-                if bit_index < B:
-                    code_block[k] = input_bits[bit_index]
-                    bit_index += 1
-                else:
-                    code_block[k] = 0
-
-            # Attach CRC24B if needed
-            if L >= 1:
-                if r == 0 and F > 0:
-                    data_for_crc = code_block[F:data_length]
-                else:
-                    data_for_crc = code_block[:data_length]
-
-                # CRC calculation treats -1 as 0
-                crc_bits = self.crc_calculate(data_for_crc, self.gCRC24B, L)
-                code_block[data_length:] = crc_bits
-
-            code_blocks.append(code_block)
-
-        segmentation_info = {
-            'B': B,
-            'C': C,
-            'L': L,
-            'B_prime': B_prime,
-            'K_plus': K_plus,
-            'K_minus': K_minus,
-            'C_plus': C_plus,
-            'C_minus': C_minus,
-            'F': F,
-            'code_block_sizes': [len(cb) for cb in code_blocks]
-        }
-
-        return code_blocks, segmentation_info
 
 
 # ============================================================================
