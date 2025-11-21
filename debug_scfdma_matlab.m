@@ -124,7 +124,7 @@ fprintf('\n');
 fprintf('--- TX: Add CP with half-SC shift ---\n');
 extended = [time_out(end-cpLength+1:end); time_out];
 phase_idx = double((-cpLength:(nFFT-1))');
-phase = exp(1i * pi * phase_idx / double(nFFT));
+phase = exp(1i * pi * (double(phase_idx) / double(nFFT)));
 tx_waveform = extended .* phase;
 fprintf('CP length: %d\n', cpLength);
 fprintf('Extended length: %d\n', length(extended));
@@ -148,7 +148,7 @@ fprintf('\n');
 
 fprintf('--- RX: Half-SC shift correction ---\n');
 idx = double((0:(nFFT-1))');  % MATLAB: 0-indexed for this calculation
-halfsc = exp(1i * pi / double(nFFT) * (idx + fftStart - 1 - cpLength));  % Adjust for MATLAB indexing
+halfsc = exp(1i * pi * (idx + fftStart - 1 - cpLength) / double(nFFT));  % Adjust for MATLAB indexing
 samples = samples .* halfsc;
 fprintf('samples after halfsc[1:3] = [%.6f%+.6fi, %.6f%+.6fi, %.6f%+.6fi]\n', ...
     real(samples(1)), imag(samples(1)), ...
@@ -165,7 +165,7 @@ fprintf('After FFT[1:3] = [%.6f%+.6fi, %.6f%+.6fi, %.6f%+.6fi]\n', ...
 fprintf('\n');
 
 fprintf('--- RX: Phase correction (BEFORE fftshift) ---\n');
-phaseCorr = exp(-1i * 2 * pi * (cpLength - (fftStart-1)) / double(nFFT) * idx);  % Adjust for MATLAB indexing
+phaseCorr = exp(-1i * 2 * pi * ((cpLength - (fftStart-1)) * idx) / double(nFFT));  % Adjust for MATLAB indexing
 freq_rx = freq_rx .* phaseCorr;
 fprintf('After phase corr[1:3] = [%.6f%+.6fi, %.6f%+.6fi, %.6f%+.6fi]\n', ...
     real(freq_rx(1)), imag(freq_rx(1)), ...
