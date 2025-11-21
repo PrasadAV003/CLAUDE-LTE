@@ -171,9 +171,12 @@ def test_minimal_manual():
     print(f"Parameters: nFFT={nFFT}, nSC={nSC}, cpLength={cpLength}")
 
     # MODULATE
+    # SC-FDMA: DFT spreading
+    dftOut = np.fft.fft(grid_in, nSC)
+
     freq_array = np.zeros(nFFT, dtype=np.complex128)
     firstSC = nFFT//2 - nSC//2
-    freq_array[firstSC:firstSC+nSC] = grid_in
+    freq_array[firstSC:firstSC+nSC] = dftOut
 
     freq_shifted = np.fft.fftshift(freq_array)
     iffout = np.fft.ifft(freq_shifted)
@@ -204,7 +207,10 @@ def test_minimal_manual():
     fftout = np.fft.fftshift(fftout)
 
     firstActiveSC = nFFT//2 - nSC//2
-    grid_out = fftout[firstActiveSC:firstActiveSC+nSC]
+    activeSCs = fftout[firstActiveSC:firstActiveSC+nSC]
+
+    # SC-FDMA: IFFT despreading
+    grid_out = np.fft.ifft(activeSCs, nSC)
 
     # Compare
     mse = np.mean(np.abs(grid_in - grid_out)**2)

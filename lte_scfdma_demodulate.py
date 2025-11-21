@@ -295,8 +295,11 @@ class LTESCFDMADemodulator:
                     # MATLAB: fftOutput(firstActiveSC:firstActiveSC+totalActiveSC-1,:)
                     activeSCs = fftOutput[firstActiveSC:firstActiveSC+totalActiveSC]
 
+                    # SC-FDMA: IFFT despreading (M-point IFFT)
+                    despread = np.fft.ifft(activeSCs, totalActiveSC)
+
                     # Assign to grid
-                    reGrid[:, symbol_idx, ant] = activeSCs
+                    reGrid[:, symbol_idx, ant] = despread
 
                     # Update offset
                     if (sym_in_slot + 1) == symbols_per_slot:
