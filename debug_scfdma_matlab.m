@@ -123,7 +123,7 @@ fprintf('\n');
 
 fprintf('--- TX: Add CP with half-SC shift ---\n');
 extended = [time_out(end-cpLength+1:end); time_out];
-phase_idx = (-cpLength:(nFFT-1))';
+phase_idx = double((-cpLength:(nFFT-1))');
 phase = exp(1i * pi * phase_idx / nFFT);
 tx_waveform = extended .* phase;
 fprintf('CP length: %d\n', cpLength);
@@ -147,7 +147,7 @@ fprintf('samples[1:3] = [%.6f%+.6fi, %.6f%+.6fi, %.6f%+.6fi]\n', ...
 fprintf('\n');
 
 fprintf('--- RX: Half-SC shift correction ---\n');
-idx = (0:(nFFT-1))';  % MATLAB: 0-indexed for this calculation
+idx = double((0:(nFFT-1))');  % MATLAB: 0-indexed for this calculation
 halfsc = exp(1i * pi / nFFT * (idx + fftStart - 1 - cpLength));  % Adjust for MATLAB indexing
 samples = samples .* halfsc;
 fprintf('samples after halfsc[1:3] = [%.6f%+.6fi, %.6f%+.6fi, %.6f%+.6fi]\n', ...
