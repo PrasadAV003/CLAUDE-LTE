@@ -11,9 +11,9 @@ ue.NULRB = 6;
 ue.CyclicPrefixUL = 'Normal';
 ue.Windowing = 0;  % No windowing for simplicity
 
-% Simple test input: 3 symbols, using fixed binary data
+% Simple test input: 14 symbols (2 slots), using fixed binary data
 nSC = 72;
-nSymbols = 3;
+nSymbols = 14;  % 2 slots for Normal CP (7 symbols per slot)
 
 % Fixed binary sequence for reproducibility
 binary_str = '0000000100110010010001010111011011001101111111101000100110111010';
