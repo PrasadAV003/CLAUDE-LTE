@@ -217,8 +217,10 @@ def lteCodeBlockDesegment(cbs: Union[np.ndarray, List[np.ndarray]],
             data_with_crc = cb[start_idx:K_r]
 
             # Check and remove CRC
-            decoded, crc_ok = lteCRCDecode(data_with_crc, '24B')
-            crc_errors.append(0 if crc_ok else 1)
+            # lteCRCDecode returns (data, err) where err is uint32
+            decoded, err = lteCRCDecode(data_with_crc, '24B')
+            # err == 0 means CRC passed, err != 0 means failure
+            crc_errors.append(0 if err == 0 else 1)
 
             # Append decoded data (CRC already stripped by lteCRCDecode)
             output_bits.extend(decoded.tolist())

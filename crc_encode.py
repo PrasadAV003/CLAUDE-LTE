@@ -183,26 +183,52 @@ def lteCRCEncode(blk, poly, mask=0):
 
 def lteCRCDecode(blkcrc, poly, mask=0):
     """
-    CRC decoding - check and remove CRC
+    MATLAB lteCRCDecode equivalent - CRC decoding and removal
 
-    Performs the inverse of lteCRCEncode by checking CRC validity
-    and returning the data portion without CRC.
+    Checks input data vector for CRC error assuming the vector comprises
+    a block of data with CRC bits attached. Returns data part and the
+    logical difference (XOR) between attached CRC and recalculated CRC.
+
+    Syntax:
+        blk, err = lteCRCDecode(blkcrc, poly)
+        blk, err = lteCRCDecode(blkcrc, poly, mask)
 
     Parameters:
-        blkcrc: Input bit vector with CRC attached (int8 array)
+        blkcrc: Input bit vector with CRC attached (column vector)
+                Can contain soft values - will be converted to hard bits
         poly: CRC polynomial ('8', '16', '24A', '24B')
-        mask: XOR mask value (optional, must match encoding mask)
+        mask: XOR mask value (optional, e.g., RNTI for masking)
+              Applied MSB-first before returning in err
 
     Returns:
-        blk: Data bits without CRC (int8 array)
-        crc_ok: Boolean indicating if CRC check passed
+        blk: Data-only part of input (int8 column vector)
+        err: Logical difference (XOR) between received and calculated CRC (uint32)
+             If err != 0: either error occurred or CRC was masked
+             If err == 0: CRC check passed
 
     Examples:
-        >>> data = np.ones(100, dtype=int)
-        >>> encoded = lteCRCEncode(data, '24B')
-        >>> decoded, ok = lteCRCDecode(encoded, '24B')
-        >>> assert ok == True
-        >>> assert np.array_equal(decoded, data)
+        >>> # Example 1: CRC decode without mask
+        >>> rnti = 8
+        >>> blkcrc = lteCRCEncode(np.ones(100), '24A', rnti)
+        >>> blk, err = lteCRCDecode(blkcrc, '24A')
+        >>> # err = 8 (equals RNTI because CRC was masked)
+
+        >>> # Example 2: CRC decode with mask
+        >>> blk, err = lteCRCDecode(blkcrc, '24A', rnti)
+        >>> # err = 0 (mask cancels out)
+
+        >>> # Example 3: HARQ soft combining scenario
+        >>> # Soft bits from multiple transmissions combined
+        >>> soft_bits = np.array([1.2, -0.8, 2.3, ...])  # LLRs
+        >>> hard_bits = np.where(soft_bits >= 0, 0, 1)  # Hard decision
+        >>> blk, err = lteCRCDecode(hard_bits, '24B')
+        >>> if err == 0:
+        >>>     print("CRC passed")
+
+    Note:
+        For HARQ chase combining, soft bits should be combined using
+        lteRateRecoverTurbo with cbsbuffer parameter before turbo decoding.
+        This function works on hard bits after decoding.
     """
     # Determine CRC length
     crc_lengths = {'8': 8, '16': 16, '24A': 24, '24B': 24}
@@ -211,28 +237,44 @@ def lteCRCDecode(blkcrc, poly, mask=0):
 
     L = crc_lengths[poly]
 
-    # Convert to numpy array
-    blkcrc = np.array(blkcrc, dtype=np.int8)
+    # Convert to numpy array and make hard decisions if needed
+    blkcrc = np.array(blkcrc, dtype=float)
+
+    # If input contains soft values, convert to hard bits
+    # LLR convention: positive = 0, negative = 1
+    # But also handle direct bit values (0 or 1)
+    if np.any((blkcrc < 0) | (blkcrc > 1)):
+        # Contains soft values (LLRs) - make hard decision
+        blkcrc_hard = np.where(blkcrc >= 0, 0, 1).astype(np.int8)
+    else:
+        # Already hard bits
+        blkcrc_hard = blkcrc.astype(np.int8)
 
     # Check length
-    if len(blkcrc) < L:
+    if len(blkcrc_hard) < L:
         raise ValueError(f"Input too short for {poly} CRC (need at least {L} bits)")
 
     # Split data and received CRC
-    data_bits = blkcrc[:-L]
-    received_crc = blkcrc[-L:]
+    data_bits = blkcrc_hard[:-L]
+    received_crc_bits = blkcrc_hard[-L:]
 
-    # Calculate expected CRC on data portion
+    # Calculate expected CRC on data portion (without mask)
     crc_processor = LTE_CRC()
-    calculated_crc = crc_processor.crc_attach(data_bits, crc_type=poly, mask=mask)
+    calculated_with_crc = crc_processor.crc_attach(data_bits, crc_type=poly, mask=0)
+    calculated_crc_bits = calculated_with_crc[-L:]
 
-    # Extract just the CRC portion from calculated result
-    expected_crc = calculated_crc[-L:]
+    # Convert CRC bit arrays to integers for XOR comparison
+    # MSB first (leftmost bit is most significant)
+    received_crc_int = int(''.join(str(b) for b in received_crc_bits), 2)
+    calculated_crc_int = int(''.join(str(b) for b in calculated_crc_bits), 2)
 
-    # Check if CRCs match
-    crc_ok = np.array_equal(received_crc, expected_crc)
+    # Compute XOR difference
+    crc_diff = received_crc_int ^ calculated_crc_int
 
-    return data_bits, crc_ok
+    # Apply mask (XOR with mask)
+    err = np.uint32(crc_diff ^ mask)
+
+    return data_bits, err
 
 
 def binary_string_to_array(binary_string: str) -> np.ndarray:
