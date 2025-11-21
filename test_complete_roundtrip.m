@@ -5,7 +5,10 @@
 function test_complete_roundtrip()
     % Base sequence (64 bits)
     binary_str = '0000000100110010010001010111011011001101111111101000100110111010';
-    base_seq = int8(arrayfun(@str2num, num2cell(binary_str)));
+    % Convert binary string to int8 array using ASCII arithmetic
+    % '0' -> 0, '1' -> 1 (subtracting ASCII value of '0' which is 48)
+    base_seq = int8(binary_str - '0');
+    base_seq = base_seq(:);  % Ensure column vector
 
     % Test sizes: 40, 1088, 6145 (not 6144 to trigger multi-block segmentation)
     test_sizes = [40, 1088, 6145];
