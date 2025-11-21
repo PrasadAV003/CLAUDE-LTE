@@ -181,6 +181,60 @@ def lteCRCEncode(blk, poly, mask=0):
     return crc_processor.crc_attach(blk, crc_type=poly, mask=mask)
 
 
+def lteCRCDecode(blkcrc, poly, mask=0):
+    """
+    CRC decoding - check and remove CRC
+
+    Performs the inverse of lteCRCEncode by checking CRC validity
+    and returning the data portion without CRC.
+
+    Parameters:
+        blkcrc: Input bit vector with CRC attached (int8 array)
+        poly: CRC polynomial ('8', '16', '24A', '24B')
+        mask: XOR mask value (optional, must match encoding mask)
+
+    Returns:
+        blk: Data bits without CRC (int8 array)
+        crc_ok: Boolean indicating if CRC check passed
+
+    Examples:
+        >>> data = np.ones(100, dtype=int)
+        >>> encoded = lteCRCEncode(data, '24B')
+        >>> decoded, ok = lteCRCDecode(encoded, '24B')
+        >>> assert ok == True
+        >>> assert np.array_equal(decoded, data)
+    """
+    # Determine CRC length
+    crc_lengths = {'8': 8, '16': 16, '24A': 24, '24B': 24}
+    if poly not in crc_lengths:
+        raise ValueError(f"Invalid CRC polynomial: {poly}")
+
+    L = crc_lengths[poly]
+
+    # Convert to numpy array
+    blkcrc = np.array(blkcrc, dtype=np.int8)
+
+    # Check length
+    if len(blkcrc) < L:
+        raise ValueError(f"Input too short for {poly} CRC (need at least {L} bits)")
+
+    # Split data and received CRC
+    data_bits = blkcrc[:-L]
+    received_crc = blkcrc[-L:]
+
+    # Calculate expected CRC on data portion
+    crc_processor = LTE_CRC()
+    calculated_crc = crc_processor.crc_attach(data_bits, crc_type=poly, mask=mask)
+
+    # Extract just the CRC portion from calculated result
+    expected_crc = calculated_crc[-L:]
+
+    # Check if CRCs match
+    crc_ok = np.array_equal(received_crc, expected_crc)
+
+    return data_bits, crc_ok
+
+
 def binary_string_to_array(binary_string: str) -> np.ndarray:
     """Convert binary string to numpy array"""
     return np.array([int(bit) for bit in binary_string], dtype=int)
