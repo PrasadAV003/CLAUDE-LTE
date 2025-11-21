@@ -799,10 +799,11 @@ def lteRateMatchTurbo(in_data, outlen, rv, chs=None):
             # Calculate D (length of each stream)
             D = len(code_block) // 3
 
-            # Extract streams (already in [S P1 P2] format from lteTurboEncode)
-            d0 = code_block[0::3]
-            d1 = code_block[1::3]
-            d2 = code_block[2::3]
+            # Extract streams - input is in [S | P1 | P2] format from lteTurboEncode
+            # Not interleaved, so extract as contiguous blocks
+            d0 = code_block[0:D]
+            d1 = code_block[D:2*D]
+            d2 = code_block[2*D:3*D]
 
             # Create circular buffer
             w, K_w = rate_matcher.create_circular_buffer(d0, d1, d2)
@@ -848,10 +849,11 @@ def lteRateMatchTurbo(in_data, outlen, rv, chs=None):
         # Calculate D (length of each stream)
         D = len(in_array) // 3
 
-        # Extract streams (already in [S P1 P2] format from lteTurboEncode)
-        d0 = in_array[0::3]
-        d1 = in_array[1::3]
-        d2 = in_array[2::3]
+        # Extract streams - input is in [S | P1 | P2] format from lteTurboEncode
+        # Not interleaved, so extract as contiguous blocks
+        d0 = in_array[0:D]
+        d1 = in_array[D:2*D]
+        d2 = in_array[2*D:3*D]
 
         # Create circular buffer
         w, K_w = rate_matcher.create_circular_buffer(d0, d1, d2)

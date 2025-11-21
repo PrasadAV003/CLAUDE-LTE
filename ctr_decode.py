@@ -158,8 +158,12 @@ def lteCodeBlockDesegment(cbs: Union[np.ndarray, List[np.ndarray]],
     """
     Code block desegmentation with CRC checking
 
+    Parameters:
+        cbs: Code blocks (output from turbo decoder)
+        blklen: Transport block length (without transport CRC)
+
     Returns:
-        blk: Desegmented output block (int8)
+        blk: Desegmented output block including transport CRC (int8)
         err: CRC error indicators (int8), 0=pass, 1=fail
     """
     # Convert to list format
@@ -172,7 +176,9 @@ def lteCodeBlockDesegment(cbs: Union[np.ndarray, List[np.ndarray]],
 
     # Determine parameters
     if blklen is not None and blklen > 0:
-        params = get_segmentation_params(blklen)
+        # blklen is transport block size without CRC
+        # Segmentation happened after transport CRC attachment (blklen + 24)
+        params = get_segmentation_params(blklen + 24)
         F = params['F']
         L = params['L']
         K_plus = params['K_plus']
@@ -612,7 +618,7 @@ def lteRateRecoverTurbo(in_data: Union[np.ndarray, List[np.ndarray]],
 
     Parameters:
         in_data: Rate matched bits (soft values/LLRs)
-        trblklen: Transport block length
+        trblklen: Transport block length (without transport CRC)
         rv: Redundancy version (0-3)
         cbsbuffers: Previous soft buffers for HARQ combining
 
@@ -622,7 +628,9 @@ def lteRateRecoverTurbo(in_data: Union[np.ndarray, List[np.ndarray]],
     recovery = LTE_RateRecovery()
 
     # Get segmentation parameters
-    params = get_segmentation_params(trblklen)
+    # Note: trblklen is without transport CRC, but segmentation happens after CRC attachment
+    # Transport CRC is always 24 bits (CRC-24A)
+    params = get_segmentation_params(trblklen + 24)
     C = params['C']
 
     # Handle inputs
