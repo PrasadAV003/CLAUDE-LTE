@@ -639,6 +639,98 @@ def array_to_binary_string(bit_array) -> str:
     return ''.join(['N' if int(b) == -1 else str(int(b)) for b in bit_array])
 
 
+def lteTurboEncode(blk):
+    """
+    MATLAB lteTurboEncode equivalent - Turbo encoding
+
+    Syntax:
+        out = lteTurboEncode(in)
+
+    Parameters:
+        blk: Input data vector or cell array (Python list) of vectors
+             Only legal turbo interleaver block sizes are supported (40-6144)
+             Filler bits supported through negative input values (-1)
+
+    Returns:
+        out: Turbo encoded bits as int8 vector or cell array of int8 vectors
+             Output format: [S P1 P2] where:
+               S = systematic bits (K+4)
+               P1 = encoder 1 parity bits (K+4)
+               P2 = encoder 2 parity bits (K+4)
+             Total output length: 3*(K+4) bits
+
+    MATLAB Documentation:
+        "The encoder is a Parallel Concatenated Convolutional Code (PCCC) with
+        two 8-state constituent encoders and a contention free interleaver. The
+        coding rate of turbo encoder is 1/3 and the 3 encoded parity streams
+        are concatenated block-wise to form the encoded output i.e. [S P1 P2]
+        where S is the systematic bits, P1 is the encoder 1 bits and P2 is the
+        encoder 2 bits. To support the correct processing of filler bits,
+        negative input bit values are specially processed. They are treated as
+        logical 0 at the input to both encoders but their negative values are
+        passed directly through to the associated output positions in
+        sub-blocks S and P1."
+
+    Examples:
+        >>> # Single vector input
+        >>> out1 = lteTurboEncode(np.ones(40, dtype=int))
+        >>> out1.shape
+        (132,)
+        >>> out1.dtype
+        dtype('int8')
+
+        >>> # Cell array input
+        >>> out2 = lteTurboEncode([np.ones(40, dtype=int), np.ones(6144, dtype=int)])
+        >>> len(out2)
+        2
+        >>> [len(cb) for cb in out2]
+        [132, 18444]
+
+        >>> # With filler bits (-1)
+        >>> input_with_filler = np.array([-1, -1, 1, 0, 1, 1, 0, 1] + [1]*32, dtype=int)
+        >>> out3 = lteTurboEncode(input_with_filler)
+        >>> out3[0]  # Filler bit passed through in S
+        -1
+    """
+    encoder = LTE_TurboEncoder()
+
+    # Check if input is cell array (Python list)
+    if isinstance(blk, list):
+        # Process each vector in the cell array
+        result = []
+        for vec in blk:
+            vec_array = np.array(vec, dtype=int)
+            K = len(vec_array)
+
+            # Count filler bits (negative values)
+            F = np.sum(vec_array < 0)
+
+            # Encode
+            d0, d1, d2 = encoder.turbo_encode(vec_array.tolist(), F=F)
+
+            # Concatenate [S P1 P2] and convert to int8
+            output = np.concatenate([d0, d1, d2]).astype(np.int8)
+            result.append(output)
+
+        return result
+
+    else:
+        # Single vector input
+        blk_array = np.array(blk, dtype=int)
+        K = len(blk_array)
+
+        # Count filler bits (negative values)
+        F = np.sum(blk_array < 0)
+
+        # Encode
+        d0, d1, d2 = encoder.turbo_encode(blk_array.tolist(), F=F)
+
+        # Concatenate [S P1 P2] and convert to int8
+        output = np.concatenate([d0, d1, d2]).astype(np.int8)
+
+        return output
+
+
 def calculate_rate_matching_E(num_blocks: int, input_bits: int, N_PRB: int, Q_m: int,
                                n_layers: int = 1, N_symb_PUSCH: int = 12) -> List[int]:
     """
