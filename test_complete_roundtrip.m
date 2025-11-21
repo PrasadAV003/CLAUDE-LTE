@@ -196,46 +196,46 @@ function [decoded_data, errors, result] = run_complete_roundtrip_test(test_bits,
     fprintf(fid, '%s\n', repmat('-', 1, 40));
     code_blocks = lteCodeBlockSegment(data_with_crc);
 
-    if iscell(code_blocks)
-        C = length(code_blocks);
-        fprintf(fid, 'Number of blocks (C): %d\n', C);
-
-        for idx = 1:C
-            cb = code_blocks{idx};
-            fprintf(fid, '\n  Code Block %d:\n', idx-1);
-            save_array_to_file(fid, sprintf('    Block %d data', idx-1), cb);
-            fprintf(fid, '    Filler bits (-1): %d\n', sum(cb == -1));
-        end
-    else
-        C = 1;
-        fprintf(fid, 'Number of blocks (C): 1\n');
-        save_array_to_file(fid, '  Single block data', code_blocks);
-        fprintf(fid, '  Filler bits (-1): %d\n', sum(code_blocks == -1));
+    % Ensure code_blocks is always a cell array for consistent handling
+    if ~iscell(code_blocks)
+        code_blocks = {code_blocks};
     end
+
+    C = length(code_blocks);
+    fprintf(fid, 'Number of blocks (C): %d\n', C);
+
+    % Store code block sizes for later use in desegmentation
+    code_block_sizes = zeros(1, C);
+    for idx = 1:C
+        cb = code_blocks{idx};
+        code_block_sizes(idx) = length(cb);
+        fprintf(fid, '\n  Code Block %d:\n', idx-1);
+        save_array_to_file(fid, sprintf('    Block %d data', idx-1), cb);
+        fprintf(fid, '    Filler bits (-1): %d\n', sum(cb == -1));
+    end
+    fprintf(fid, 'Code block sizes: %s\n', mat2str(code_block_sizes));
 
     % Stage 4: Turbo encoding
     fprintf(fid, '\n\nSTAGE 4: TURBO ENCODING\n');
     fprintf(fid, '%s\n', repmat('-', 1, 40));
     turbo_encoded = lteTurboEncode(code_blocks);
 
-    if iscell(turbo_encoded)
-        fprintf(fid, 'Number of blocks: %d\n', length(turbo_encoded));
-        fprintf(fid, 'Rate: 1/3 (each K bits → 3*(K+4) bits)\n');
-
-        for idx = 1:length(turbo_encoded)
-            te = turbo_encoded{idx};
-            fprintf(fid, '\n  Turbo Encoded Block %d:\n', idx-1);
-            fprintf(fid, '    Length: %d\n', length(te));
-            save_array_to_file(fid, sprintf('    Block %d encoded', idx-1), te);
-            fprintf(fid, '    NULL bits (-1): %d\n', sum(te == -1));
-        end
-        total_turbo_bits = sum(cellfun(@length, turbo_encoded));
-    else
-        fprintf(fid, 'Output length: %d bits\n', length(turbo_encoded));
-        save_array_to_file(fid, 'Turbo encoded data', turbo_encoded);
-        fprintf(fid, 'NULL bits (-1): %d\n', sum(turbo_encoded == -1));
-        total_turbo_bits = length(turbo_encoded);
+    % Ensure turbo_encoded is always a cell array
+    if ~iscell(turbo_encoded)
+        turbo_encoded = {turbo_encoded};
     end
+
+    fprintf(fid, 'Number of blocks: %d\n', length(turbo_encoded));
+    fprintf(fid, 'Rate: 1/3 (each K bits -> 3*(K+4) bits)\n');
+
+    for idx = 1:length(turbo_encoded)
+        te = turbo_encoded{idx};
+        fprintf(fid, '\n  Turbo Encoded Block %d:\n', idx-1);
+        fprintf(fid, '    Length: %d\n', length(te));
+        save_array_to_file(fid, sprintf('    Block %d encoded', idx-1), te);
+        fprintf(fid, '    NULL bits (-1): %d\n', sum(te == -1));
+    end
+    total_turbo_bits = sum(cellfun(@length, turbo_encoded));
 
     % Stage 5: Rate matching
     fprintf(fid, '\n\nSTAGE 5: RATE MATCHING\n');
@@ -281,13 +281,14 @@ function [decoded_data, errors, result] = run_complete_roundtrip_test(test_bits,
     fprintf(fid, '%s\n', repmat('-', 1, 40));
     rate_recovered = lteRateRecoverTurbo(received_soft, length(test_bits), 0);
 
-    if iscell(rate_recovered)
-        fprintf(fid, 'Number of blocks: %d\n', length(rate_recovered));
-        for idx = 1:length(rate_recovered)
-            fprintf(fid, '  Block %d length: %d\n', idx-1, length(rate_recovered{idx}));
-        end
-    else
-        fprintf(fid, 'Output length: %d soft bits\n', length(rate_recovered));
+    % Ensure rate_recovered is always a cell array
+    if ~iscell(rate_recovered)
+        rate_recovered = {rate_recovered};
+    end
+
+    fprintf(fid, 'Number of blocks: %d\n', length(rate_recovered));
+    for idx = 1:length(rate_recovered)
+        fprintf(fid, '  Block %d length: %d\n', idx-1, length(rate_recovered{idx}));
     end
 
     % Stage 7: Turbo decoding
@@ -295,23 +296,40 @@ function [decoded_data, errors, result] = run_complete_roundtrip_test(test_bits,
     fprintf(fid, '%s\n', repmat('-', 1, 40));
     turbo_decoded = lteTurboDecode(rate_recovered, 5);
 
-    if iscell(turbo_decoded)
-        fprintf(fid, 'Number of blocks: %d\n', length(turbo_decoded));
-        fprintf(fid, 'Iterations: 5\n');
-        fprintf(fid, 'Algorithm: Max-Log-MAP\n');
-        for idx = 1:length(turbo_decoded)
-            fprintf(fid, '  Block %d length: %d\n', idx-1, length(turbo_decoded{idx}));
-        end
-    else
-        fprintf(fid, 'Output length: %d bits\n', length(turbo_decoded));
-        fprintf(fid, 'Iterations: 5\n');
-        fprintf(fid, 'Algorithm: Max-Log-MAP\n');
+    % Ensure turbo_decoded is always a cell array
+    if ~iscell(turbo_decoded)
+        turbo_decoded = {turbo_decoded};
+    end
+
+    fprintf(fid, 'Number of blocks: %d\n', length(turbo_decoded));
+    fprintf(fid, 'Iterations: 5\n');
+    fprintf(fid, 'Algorithm: Max-Log-MAP\n');
+    for idx = 1:length(turbo_decoded)
+        fprintf(fid, '  Block %d length: %d (expected: %d)\n', idx-1, length(turbo_decoded{idx}), code_block_sizes(idx));
     end
 
     % Stage 8: Code block desegmentation
     fprintf(fid, '\n\nSTAGE 8: CODE BLOCK DESEGMENTATION\n');
     fprintf(fid, '%s\n', repmat('-', 1, 40));
-    [desegmented, crc_errors] = lteCodeBlockDesegment(turbo_decoded, length(test_bits));
+
+    % Verify turbo decoded blocks match expected sizes
+    sizes_match = true;
+    for idx = 1:length(turbo_decoded)
+        if length(turbo_decoded{idx}) ~= code_block_sizes(idx)
+            sizes_match = false;
+            fprintf(fid, 'WARNING: Block %d size mismatch! Got %d, expected %d\n', ...
+                idx-1, length(turbo_decoded{idx}), code_block_sizes(idx));
+        end
+    end
+
+    % For single block case, MATLAB may expect vector not cell
+    if length(turbo_decoded) == 1
+        turbo_decoded_for_deseg = turbo_decoded{1};
+    else
+        turbo_decoded_for_deseg = turbo_decoded;
+    end
+
+    [desegmented, crc_errors] = lteCodeBlockDesegment(turbo_decoded_for_deseg, length(test_bits));
 
     fprintf(fid, 'Expected output length: %d bits (data + transport CRC)\n', length(test_bits) + 24);
     fprintf(fid, 'Actual output length: %d bits\n', length(desegmented));
