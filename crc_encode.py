@@ -274,6 +274,47 @@ class LTE_CRC_CodeBlockSegmentation:
 # HELPER FUNCTIONS
 # ============================================================================
 
+def lteCodeBlockSegment(blk):
+    """
+    MATLAB-style wrapper for code block segmentation
+
+    Syntax:
+        cbs = lteCodeBlockSegment(blk)
+
+    Parameters:
+        blk: Data bit vector (column or row)
+
+    Returns:
+        cbs: List of code block segments (MATLAB cell array equivalent)
+             Each block contains -1 for filler bits and CRC24B if applicable
+
+    MATLAB Behavior:
+        - If len(blk) <= 6144: Returns single code block (may have -1 filler bits)
+        - If len(blk) > 6144: Returns multiple code blocks with CRC24B appended
+
+    Examples:
+        >>> # No segmentation (B <= 6144)
+        >>> cbs1 = lteCodeBlockSegment(np.ones(6144, dtype=int))
+        >>> len(cbs1)
+        1
+        >>> len(cbs1[0])
+        6144
+
+        >>> # With segmentation (B > 6144)
+        >>> cbs2 = lteCodeBlockSegment(np.ones(6145, dtype=int))
+        >>> len(cbs2)
+        2
+        >>> [len(cb) for cb in cbs2]
+        [3072, 3136]
+    """
+    crc_processor = LTE_CRC_CodeBlockSegmentation()
+    code_blocks, _ = crc_processor.code_block_segmentation(blk)
+
+    # Return only code blocks (not segmentation info) to match MATLAB
+    # Convert to int8 for exact MATLAB compatibility
+    return [cb.astype(np.int8) for cb in code_blocks]
+
+
 def lteCRCEncode(blk, poly, mask=0):
     """
     MATLAB-style wrapper function for CRC encoding
@@ -372,25 +413,33 @@ if __name__ == "__main__":
         print(f"CRC-{poly:4}: {crc} ({len(crc)} bits)")
     print()
 
-    # Example 5: Code block segmentation
-    print("Example 5: Code block segmentation with filler bits")
+    # Example 5: MATLAB-compatible code block segmentation
+    print("Example 5: MATLAB lteCodeBlockSegment equivalent")
     print("-" * 70)
-    processor = LTE_CRC_CodeBlockSegmentation()
 
-    # Large transport block that requires segmentation
-    tb_size = 6200
-    tb_bits = np.random.randint(0, 2, tb_size)
+    # Test case 1: No segmentation (B <= 6144)
+    cbs1 = lteCodeBlockSegment(np.ones(6144, dtype=int))
+    print(f"Input length 6144 (no segmentation):")
+    print(f"  Number of blocks: {len(cbs1)}")
+    print(f"  Block size: {len(cbs1[0])}")
+    print(f"  Data type: {cbs1[0].dtype}")
+    print()
 
-    code_blocks, info = processor.code_block_segmentation(tb_bits)
+    # Test case 2: With segmentation (B > 6144)
+    cbs2 = lteCodeBlockSegment(np.ones(6145, dtype=int))
+    print(f"Input length 6145 (with segmentation):")
+    print(f"  Number of blocks: {len(cbs2)}")
+    print(f"  Block sizes: {[len(cb) for cb in cbs2]}")
+    print(f"  Expected: [3072, 3136] (matches MATLAB)")
+    print()
 
-    print(f"Transport block: {tb_size} bits")
-    print(f"Code blocks: {info['C']}")
-    print(f"Filler bits: {info['F']}")
-    print(f"Block sizes: K+={info['K_plus']}, K-={info['K_minus']}")
-
-    if info['F'] > 0:
-        cb0 = code_blocks[0]
-        print(f"First code block filler bits: {cb0[:info['F']][:5]}... (all -1)")
+    # Test case 3: With filler bits
+    cbs3 = lteCodeBlockSegment(np.ones(6200, dtype=int))
+    print(f"Input length 6200 (with filler bits):")
+    print(f"  Number of blocks: {len(cbs3)}")
+    filler_count = np.sum(cbs3[0] == -1)
+    print(f"  Filler bits in first block: {filler_count}")
+    print(f"  First 5 bits of block 0: {cbs3[0][:5]} (should contain -1)")
 
     print()
     print("="*70)
