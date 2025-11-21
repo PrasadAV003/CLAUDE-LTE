@@ -18,11 +18,23 @@ ue = {
     'Windowing': 0  # No windowing for simplicity
 }
 
-# Simple test input: 3 symbols, first 3 subcarriers = 1, rest = 0
+# Simple test input: 3 symbols, using fixed binary data
 nSC = 72
 nSymbols = 3
-grid_in = np.zeros((nSC, nSymbols), dtype=np.complex128)
-grid_in[0:3, :] = 1.0  # First 3 subcarriers = 1
+
+# Fixed binary sequence for reproducibility
+binary_str = '0000000100110010010001010111011011001101111111101000100110111010'
+base_seq = np.array([int(b) for b in binary_str], dtype=np.int8)
+
+# Convert binary to BPSK symbols (0→-1, 1→+1)
+bpsk_seq = 2 * base_seq - 1
+
+# Replicate to fill nSC subcarriers
+full_seq = np.tile(bpsk_seq, int(np.ceil(nSC / len(bpsk_seq))))
+full_seq = full_seq[:nSC]
+
+# Create grid with same sequence for all symbols (as float, not complex for now)
+grid_in = np.tile(full_seq.reshape(-1, 1), (1, nSymbols)).astype(np.complex128)
 
 print('=== INPUT ===')
 print(f'Grid shape: [{grid_in.shape[0]}, {grid_in.shape[1]}]')

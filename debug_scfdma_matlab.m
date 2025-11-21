@@ -11,11 +11,23 @@ ue.NULRB = 6;
 ue.CyclicPrefixUL = 'Normal';
 ue.Windowing = 0;  % No windowing for simplicity
 
-% Simple test input: 3 symbols, first 3 subcarriers = 1, rest = 0
+% Simple test input: 3 symbols, using fixed binary data
 nSC = 72;
 nSymbols = 3;
-grid_in = zeros(nSC, nSymbols);
-grid_in(1:3, :) = 1;  % First 3 subcarriers = 1
+
+% Fixed binary sequence for reproducibility
+binary_str = '0000000100110010010001010111011011001101111111101000100110111010';
+base_seq = double(binary_str - '0');  % Convert to 0s and 1s
+
+% Convert binary to BPSK symbols (0→-1, 1→+1)
+bpsk_seq = 2*base_seq - 1;
+
+% Replicate to fill nSC subcarriers
+full_seq = repmat(bpsk_seq, 1, ceil(nSC/length(bpsk_seq)));
+full_seq = full_seq(1:nSC);
+
+% Create grid with same sequence for all symbols
+grid_in = repmat(full_seq(:), 1, nSymbols);
 
 fprintf('=== INPUT ===\n');
 fprintf('Grid shape: [%d, %d]\n', size(grid_in, 1), size(grid_in, 2));
