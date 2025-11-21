@@ -106,7 +106,7 @@ Documentation Requirements:
 ### 3. lteTurboEncode() ✅
 
 **MATLAB Documentation:** TS 36.212 Section 5.1.3
-**Python Module:** `ctr_encode.py`
+**Python Module:** `ctr_encode.py`, `turbo_encode.py`
 **Test File:** `test_matlab_turbo_encode.py`
 
 #### Verified Behaviors:
@@ -171,6 +171,76 @@ Filler bits handling          ✓ PASS
 Output format [S P1 P2]       ✓ PASS
 Coding rate 1/3               ✓ PASS
 Legal input sizes             ✓ PASS
+```
+
+---
+
+### 4. lteRateMatchTurbo() ✅
+
+**MATLAB Documentation:** TS 36.212 Section 5.1.4.1
+**Python Module:** `ctr_encode.py`
+**Test File:** `test_matlab_rate_match_turbo.py`
+
+#### Verified Behaviors:
+
+✅ **MATLAB Example: Rate match 132 bits to 100 bits**
+```matlab
+invec = ones(132,1);
+rateMatched = lteRateMatchTurbo(invec, 100, 0);
+% Result: [100x1]
+```
+✅ Python matches exactly: 100 bits output
+
+✅ **Sub-Block Interleaver**
+- Fixed 32 columns (CTCSubblock)
+- Row-by-row filling
+- Column permutation pattern from Table 5.1.4-1:
+  `[0, 16, 8, 24, 4, 20, 12, 28, ...]`
+
+✅ **Circular Buffer Creation**
+- Interlacing pattern: w = [v^(0), interleaved(v^(1), v^(2))]
+- Total size: K_w = 3 * K_PI
+
+✅ **Bit Selection and Pruning**
+- RV (redundancy version): 0, 1, 2, or 3
+- Different starting points for HARQ retransmissions
+- Circular buffer readout
+- NULL bits (-1) skipped during selection
+
+✅ **MATLAB Documentation Requirements**
+```matlab
+% "The function considers negative values in the input data as <NULL>
+% filler bits inserted during code block segmentation and skips them
+% during rate matching."
+```
+
+Test case: Turbo encoded with 5 filler bits
+- Encoded: 15 filler bits (-1) in streams
+- Rate matched: 0 filler bits (all skipped) ✓
+
+✅ **Input Validation**
+- Input length must be multiple of 3 ✓
+- RV must be 0, 1, 2, or 3 ✓
+- Empty input handled ✓
+
+✅ **Redundancy Versions**
+All RV values produce different outputs (verified for HARQ):
+- RV=0 vs RV=1: Different ✓
+- RV=0 vs RV=2: Different ✓
+- RV=0 vs RV=3: Different ✓
+- RV=1 vs RV=2: Different ✓
+- RV=1 vs RV=3: Different ✓
+- RV=2 vs RV=3: Different ✓
+
+#### Test Results:
+```
+MATLAB Example: 132 bits → 100 bits    ✓ PASS
+Complete chain (encode+rate match)     ✓ PASS
+Redundancy versions (0,1,2,3)          ✓ PASS
+Filler bits (-1) skipped               ✓ PASS
+Input validation                       ✓ PASS
+Various output lengths                 ✓ PASS
+Sub-block interleaver params           ✓ PASS
 ```
 
 ---
@@ -278,10 +348,11 @@ Users can choose:
 | `test_matlab_code_block_segment.py` | 5 | ✅ ALL PASS |
 | `test_matlab_documentation_examples.py` | 4 | ✅ ALL PASS |
 | `test_matlab_turbo_encode.py` | 7 | ✅ ALL PASS |
+| `test_matlab_rate_match_turbo.py` | 7 | ✅ ALL PASS |
 | `test_complete_lte_encoding_chain.py` | 5 | ✅ ALL PASS |
 
-**Total Tests:** 26
-**Passed:** 26
+**Total Tests:** 33
+**Passed:** 33
 **Failed:** 0
 **Success Rate:** 100%
 
