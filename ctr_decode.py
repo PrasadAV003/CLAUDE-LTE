@@ -241,14 +241,30 @@ def lteCodeBlockDesegment(cbs: Union[np.ndarray, List[np.ndarray]],
 # ============================================================================
 
 # Trellis structure for LTE RSC encoder
+# Verified to match turbo_encode.py RSC encoder exactly
 NEXT_STATES = np.array([
-    [0, 4], [0, 4], [5, 1], [5, 1],
-    [6, 2], [6, 2], [3, 7], [3, 7]
+    [0, 4],  # State 0: input 0 → state 0, input 1 → state 4
+    [0, 4],  # State 1: input 0 → state 0, input 1 → state 4
+    [5, 1],  # State 2: input 0 → state 5, input 1 → state 1
+    [5, 1],  # State 3: input 0 → state 5, input 1 → state 1
+    [6, 2],  # State 4: input 0 → state 6, input 1 → state 2
+    [6, 2],  # State 5: input 0 → state 6, input 1 → state 2
+    [3, 7],  # State 6: input 0 → state 3, input 1 → state 7
+    [3, 7],  # State 7: input 0 → state 3, input 1 → state 7
 ], dtype=np.int32)
 
+# Precomputed output table: outputs[state][input] = (systematic_bit << 1) | parity_bit
+# Key: Systematic output = input bit (not feedback!)
+# Verified to match turbo_encode.py RSC encoder exactly
 OUTPUTS = np.array([
-    [0, 3], [1, 2], [1, 2], [0, 3],
-    [0, 3], [1, 2], [1, 2], [0, 3]
+    [0, 3],  # State 0: input 0 → sys=0,par=0; input 1 → sys=1,par=1
+    [1, 2],  # State 1: input 0 → sys=0,par=1; input 1 → sys=1,par=0
+    [1, 2],  # State 2: input 0 → sys=0,par=1; input 1 → sys=1,par=0
+    [0, 3],  # State 3: input 0 → sys=0,par=0; input 1 → sys=1,par=1
+    [0, 3],  # State 4: input 0 → sys=0,par=0; input 1 → sys=1,par=1
+    [1, 2],  # State 5: input 0 → sys=0,par=1; input 1 → sys=1,par=0
+    [1, 2],  # State 6: input 0 → sys=0,par=1; input 1 → sys=1,par=0
+    [0, 3],  # State 7: input 0 → sys=0,par=0; input 1 → sys=1,par=1
 ], dtype=np.int32)
 
 
@@ -371,23 +387,31 @@ class QPPInterleaver:
         }
 
     def interleave(self, data: np.ndarray, K: int) -> np.ndarray:
+        """Interleave data using QPP: Π(i) = (f1*i + f2*i²) mod K"""
         if K not in self.params:
             raise ValueError(f"Unsupported interleaver size K={K}")
+
         f1, f2 = self.params[K]
         output = np.zeros_like(data)
+
         for i in range(K):
             pi_i = (f1 * i + f2 * i * i) % K
             output[pi_i] = data[i]
+
         return output
 
     def deinterleave(self, data: np.ndarray, K: int) -> np.ndarray:
+        """Deinterleave data using inverse QPP"""
         if K not in self.params:
             raise ValueError(f"Unsupported interleaver size K={K}")
+
         f1, f2 = self.params[K]
         output = np.zeros_like(data)
+
         for i in range(K):
             pi_i = (f1 * i + f2 * i * i) % K
             output[i] = data[pi_i]
+
         return output
 
 
@@ -398,50 +422,68 @@ class LTE_TurboDecoder:
         self.interleaver = QPPInterleaver()
 
     def decode(self, soft_input: np.ndarray, K: int, num_iterations: int = 5) -> np.ndarray:
-        """Turbo decode soft input data"""
-        N = K + 4
+        """
+        Turbo decode soft input data
 
-        # Split input: [S | P1 | P2]
+        Parameters:
+            soft_input: Soft input LLRs in [S P1 P2] format (length 3*(K+4))
+            K: Information block size (before tail bits)
+            num_iterations: Number of decoding iterations (1-30)
+
+        Returns:
+            Decoded hard bits (int8, length K)
+        """
+        N = K + 4  # Total length with tail bits
+
+        # Split input into three streams: [S | P1 | P2]
+        # Format: Block-wise concatenation, NOT interleaved
         sys_llr = soft_input[0:N].copy()
         par1_llr = soft_input[N:2*N].copy()
         par2_llr = soft_input[2*N:3*N].copy()
 
-        # Initialize a priori
+        # Initialize a priori information
         apr1 = np.zeros(N, dtype=np.float64)
         apr2 = np.zeros(N, dtype=np.float64)
 
         # Iterative decoding
         for iteration in range(num_iterations):
-            # Decoder 1
+            # Decoder 1: Process systematic + parity1
             ext1 = _siso_decode_maxlog_numba(sys_llr, par1_llr, apr1, K)
 
+            # Extend to full length for interleaving (pad tail bits with zeros)
             ext1_full = np.zeros(N, dtype=np.float64)
             ext1_full[:K] = ext1
 
-            # Interleave for decoder 2
+            # Interleave extrinsic information for decoder 2
             apr2_interleaved = self.interleaver.interleave(ext1_full, K)
 
+            # Interleave systematic information
             sys_llr_interleaved = self.interleaver.interleave(sys_llr[:K], K)
             sys_llr_int_full = np.zeros(N, dtype=np.float64)
             sys_llr_int_full[:K] = sys_llr_interleaved
+            # Add tail bits (last 4 systematic bits, not interleaved)
             sys_llr_int_full[K:] = sys_llr[K:]
 
-            # Decoder 2
+            # Decoder 2: Process interleaved systematic + parity2
             ext2 = _siso_decode_maxlog_numba(sys_llr_int_full, par2_llr, apr2_interleaved, K)
 
+            # Extend to full length
             ext2_full = np.zeros(N, dtype=np.float64)
             ext2_full[:K] = ext2
 
-            # Deinterleave
+            # Deinterleave extrinsic information for decoder 1
             apr1_deinterleaved = self.interleaver.deinterleave(ext2_full, K)
             apr1 = apr1_deinterleaved
             apr2 = apr2_interleaved
 
-        # Final decision
+        # Final decision: run one more SISO decode to get final LLRs
         ext1_final = _siso_decode_maxlog_numba(sys_llr, par1_llr, apr1, K)
 
+        # Make hard decisions
+        # Total LLR = systematic + extrinsic from decoder 1
         decoded = np.zeros(K, dtype=np.int8)
         for i in range(K):
+            # Combine systematic LLR + extrinsic LLR (which includes effect of both decoders)
             total_llr = sys_llr[i] + ext1_final[i]
             decoded[i] = 0 if total_llr >= 0 else 1
 
